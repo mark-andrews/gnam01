@@ -1,0 +1,181 @@
+---
+title: "Binary logistic regression"
+author: |
+  | Mark Andrews
+  | Psychology Department, Nottingham Trent University
+  | 
+  | \faEnvelopeO\  ```mark.andrews@ntu.ac.uk```
+fontsize: 10pt
+output:
+ beamer_presentation:
+  keep_tex: true
+  fonttheme: "serif"
+  includes:
+   in_header: preamble.tex
+---
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+library(pander)
+
+theme_set(theme_classic())
+
+```
+
+
+## Logistic regression's assumed model (simple case)
+
+- For all $i \in 1 \ldots n$,
+    $$
+    \begin{aligned}
+    y_i &\sim \mathrm{Bernoulli}(\theta_i),\\
+    \mathrm{logit}(\theta_i) &=  a + bx_i.
+    \end{aligned}
+    $$
+    or equivalently
+    $$
+    \begin{aligned}
+    y_i &\sim \mathrm{Bernoulli}(\theta_i),\\
+    \theta_i &=  \mathrm{ilogit}(a + bx_i),
+    \end{aligned}
+    $$
+    where
+    $$
+    \mathrm{logit}(\theta_i) \triangleq \log\left(\frac{\theta}{1-\theta}\right) ,
+    $$
+    and
+    $$
+    \mathrm{ilogit}(a + bx_i) \triangleq \frac{1}{1 + e^{-(a + bx_i)}}
+    $$
+ 
+## Logistic regression's assumed model (multiple regression case)
+
+- For all $i \in 1 \ldots n$,
+    $$
+    \begin{aligned}
+    y_i &\sim \mathrm{Bernoulli}(\theta_i),\\
+    \mathrm{logit}(\theta_i) &=  \beta_0 + \sum_{k=1}^K \beta_k x_{ki}
+    \end{aligned}
+    $$
+    or equivalently
+    $$
+    \begin{aligned}
+    y_i &\sim \mathrm{Bernoulli}(\theta_i),\\
+    \theta_i &=  \mathrm{ilogit}(\beta_0 + \sum_{k=1}^K \beta_k x_{ki}).
+    \end{aligned}
+    $$
+
+
+## Prediction
+
+- Given inferred values for $\beta_0, \beta_1 \ldots \beta_K$, the 
+  predicted log odds of the outcome variable taking the value of 1
+  if the predictor variables's values are $x_1, x_2 \ldots x_K$ is
+  $$
+  \beta_0 + \sum_{k=1}^K \beta_k x_{k}
+  $$
+- Knowing the predicted log odds, the predicted probability or predicted odds is easily calculated.
+
+    
+## From probabilities to odds to logits, and back
+
+\tikzset{
+    %Define standard arrow tip
+    >=stealth',
+    %Define style for boxes
+    punkt/.style={
+           rectangle,
+           rounded corners,
+           draw=black, very thick,
+           text width=10em,
+           minimum height=2em,
+           text centered},
+    % Define arrow style
+    pil/.style={
+           ->,
+           thick,
+           shorten <=2pt,
+           shorten >=2pt},
+    mstyle/.style={ row sep=2cm,nodes={state}}
+}
+
+  
+
+\begin{tikzpicture}[node distance=0.7cm, auto,]
+  \matrix(m)[matrix of nodes,ampersand replacement=\&,mstyle]{
+     \& \node[punkt] (probability) {Probability: $\theta$}; \&   \\
+      \&  \&   \\
+    \node[punkt, inner sep=5pt] (odds) {Odds: $\frac{\theta}{1-\theta}$}; \&  \&  \node[punkt, inner sep=5pt] (logit) {Logit: $\log\left(\frac{\theta}{1-\theta}\right)$}; \\
+  };
+
+   \path[pil]
+    (probability) edge[bend right=15] node [left, above, sloped] {$\tfrac{\theta}{1-\theta}$} (odds)
+    (odds)  edge[bend right=15] node [below] {$\log(\text{odds})$} (logit)
+    (logit) edge[bend right=15] node [right, above, sloped] {$\frac{1}{1+e^{-\text{logit}}}$} (probability)
+    (probability) edge[bend right=15] node [left, below, sloped] {$\log\left(\tfrac{\theta}{1-\theta}\right)$} (logit)
+    (logit) edge[bend right=15] node [above] {$e^{\text{logit}}$} (odds)
+    (odds)  edge[bend right=15] node [right, below, sloped] {$\tfrac{\text{odds}}{1+\text{odds}}$} (probability);
+    
+\end{tikzpicture}
+
+## Understanding $\beta$ coefficients
+
+-   In linear models, a coefficient for a predictor variable has a
+    straightforward interpretation: 1 unit change for a predictor
+    variable corresponds to $\beta$ change in the outcome variable.
+
+-   As logistic regression curves are nonlinear, the change in the
+    outcome variable is not a constant function of change in the
+    predictor.
+
+-   This makes interpretation more challenging.
+
+-   The most common means to interpret $\beta$ coefficients is in terms
+    of odds ratios.
+
+## Odds ratios
+
+-   We have seen that an odds in favour of an event are $\frac{p}{1-p}$.
+
+-   We can compare two odds with an odds ratio.
+
+-   For example, the odds of getting a certain job for someone with a
+    MBA might be $\frac{p}{1-p}$, while the odds of getting the same job
+    for someone without an MBA might be $\frac{q}{1-q}$.
+
+-   The ratio of the odds for the MBA to those of the non-MBA are
+    $$\frac{p}{1-p} \Big/ \frac{q}{1-q}$$
+
+-   This gives the factor by which odds for the job change for someone
+    who gains an MBA.
+
+## $\beta$ coefficients as (log) odds ratios
+
+-   Consider a logistic regression model with a single dichotomous
+    predictor, i.e.
+    $$\log\left(\frac{\Prob{y_i=1}}{1-\Prob{y_i=1}}\right) = \alpha + \beta x_i,$$ where
+    $x_i \in \{0,1\}$.
+
+-   The log odds that $y_i = 1$ when $x_i=1$ is $\alpha + \beta$.
+
+-   The log odds that $y_i = 1$ when $x_i=0$ is $\alpha$.
+
+-   The log odds that $y_i = 1$ when $x_i=1$ minus the log odds that
+    $y_i = 1$ when $x_i=0$ is $$(\alpha + \beta) - \alpha = \beta.$$
+
+## $\beta$ coefficients as (log) odds ratios
+
+-   Let's denote the probability that $y_i=1$ when $x_i=1$ by $p$, and
+    denote the probability that $y_i=1$ when $x_i=0$ by $q$.
+
+-   Subtracting the log odds is the log of the odds ratio, i.e.
+    $$\log\left(\frac{p}{1-p}\right) - \log\left(\frac{q}{1-q}\right) = \log \left( \frac{p}{1-p} \big/ \frac{q}{1-q} \right) = \beta$$
+
+-   As such, $$e^{\beta} =  \frac{p}{1-p} \big/ \frac{q}{1-q}.$$
+
+-   This provides a general interpretation for the $\beta$ coefficients.
+
