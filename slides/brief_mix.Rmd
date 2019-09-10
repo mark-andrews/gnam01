@@ -1,0 +1,238 @@
+---
+title: "Probabilistic Mixture models"
+author: |
+  | Mark Andrews
+  | Psychology Department, Nottingham Trent University
+  | 
+  | \faEnvelopeO\  ```mark.andrews@ntu.ac.uk```
+fontsize: 10pt
+output:
+ beamer_presentation:
+  keep_tex: true
+  fonttheme: "serif"
+  includes:
+   in_header: preamble.tex
+---
+
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(dplyr)
+library(ggplot2)
+library(mixtools)
+library(pander)
+library(readr)
+library(here)
+here()
+theme_set(theme_classic())
+
+co2data <- read_csv('../data/co2data.csv')
+faithful <- read_csv('../data/faithful.csv')
+```
+
+
+# Parametric model fitting
+
+- So far, we have encountered four distinct probability distributions used to model the conditional distribution of outcome variables in regression model:
+
+  * Normal distributions. These are used to model the outcome variable in standard linear regression models.
+  * Bernoulli distributions. These are models of binary outcome variables, and are used in binary logistic regression as elsewhere.
+  * Poisson distributions. These are used to model count variables, and are used in Poisson regression.
+  * Negative binomial distributions. The negative binomial distribution can be seen as similar to the Poisson distribution,
+  but with a additional width parameter.
+  
+In any cases, we can fit these models to data by modifying their parameters to achieve the best fit, often 
+done by maximum likelihood estimation.
+
+# Fitting parametric models
+
+- Assume our data is $n$ observations $y_1, y_2 \ldots y_n$. 
+- If we assume that
+$$
+y_i \sim N(\mu, \sigma^2), \quad\text{for $i \in 1 \ldots n$},
+$$
+then we can calculate the likelihood function for $\mu$ and $\sigma^2$, i.e.
+$$
+L(\mu, \sigma^2\given y_1 \ldots y_n) \propto \prod_{i=1}^n \Prob{y_i \given \mu, \sigma^2},
+$$
+and maximize this function for $\mu$ and $\sigma^2$.
+
+# Irregular distributions
+
+- What should we do when encounter data of the following form?
+```{r}
+N <- 500
+x <- sample(seq(3), size=N, replace = T)
+Df <- tibble(x = c(rnorm(N, mean=-5, sd=2),
+                   rnorm(N, mean=0, sd=1),
+                   rnorm(N*3, mean=10, sd=3)),
+             y = c(rep(1, N),
+                   rep(2, N),
+                   rep(3, N*3)) %>% as.factor()
+) 
+
+Df %>% ggplot(aes(x=x)) + geom_histogram(binwidth=1/2, col='white')
+
+```
+
+# Mixture model
+
+- A mixture model assumes that the data is sampled from independent component distributions, each of which can be modelled by parametric distributions.
+```{r}
+Df %>% ggplot(aes(x=x, fill=y)) +
+  geom_histogram(binwidth=1/2, col='white', position = 'identity') +
+  guides(fill=FALSE)
+```
+
+
+# Latent variables
+
+- With irregular data, even if assume it is derived from a mixture of independent distributions,
+  we do not know which data point came from which distributions.
+  
+- In other words, we have a set of data $y_1, y_2 \ldots y_n$, but we don't know which distribution each data point came from or even how many distributions there are. 
+
+- In this situation, we assume that for each $y_i$ data point, there is an $z_i$ that tells us which distribution $y_i$ came from.
+
+- This $z_i$ is a *latent* variable. It has some value, but we don't or can't observe it directly. 
+
+- Another name for a model of this kind is a *latent class model*. We assume each $y_i$ belongs to some class, but we just don't or can't observe what that class is.
+
+# Mixture models: The probabilistic generative model
+
+- We start by assuming that there are $K$ distinct hidden classes, e.g. $K=3$.
+- So each $z_i \in \{1, 2, 3\}$. 
+- Then, our model is 
+$$
+\begin{aligned}
+y_i &\sim 
+\begin{cases}
+N(\mu_1, \sigma^2_1),\quad\text{if $z_i = 1$}\\
+N(\mu_2, \sigma^2_2),\quad\text{if $z_i = 2$}\\
+N(\mu_3, \sigma^2_3),\quad\text{if $z_i = 3$}\\
+\end{cases},\\
+z_i &\sim P(\pi),
+\end{aligned}
+$$
+where $\pi = [\pi_1, \pi_2, \pi_3]$ is a probability distribution of $\{1, 2, 3\}$,  
+i.e. $\pi_1$ gives the probability that the latent's class's value is class 1, 
+$\pi_2$ gives the probability that the latent's class's value is class 2,
+$\pi_3$ gives the probability that the latent's class's value is class 3. 
+
+
+# Mixture models: Inference
+
+- In a normal mixture model with $K=3$ components, we have 9 parameters:
+
+  - $\mu_1$, $\sigma^2_1$: The parameters of component distribution 1.
+  - $\mu_2$, $\sigma^2_2$: The parameters of component distribution 2.
+  - $\mu_3$, $\sigma^2_3$: The parameters of component distribution 2.
+  - $\pi_1, \pi_2, \pi_3$: The relative probabilities of each component. 
+  
+- In addition, we have the probability distribution over each value $x_1, x_2 \ldots x_n$.
+
+- Inferring these values by maximum likelihood estimation is usually done by the *expectation-maximization* algorithm. 
+
+
+# Example: Old faithful
+
+- The distribution of waiting times.
+```{r}
+faithful %>% 
+  ggplot(aes(x=waiting)) + geom_histogram(col='white', binwidth = 2)
+```
+
+
+# Example: Old faithful
+
+```{r, results='hide', echo=TRUE}
+M <- normalmixEM(faithful$waiting, k=2)
+```
+```{r}
+plot(M, whichplots = 2)
+```
+
+# Example: Old faithful
+
+- The inferred means are 
+```{r}
+M$mu
+```
+- The inferred standard deviations
+```{r}
+M$sigma
+```
+
+- The relative probabilities of the two components
+```{r}
+M$lambda
+```
+
+
+# Example: Old faithful
+
+- The probabilities for each $z_i$ (for first 10 values)
+```{r}
+round(head(M$posterior, 10),3) %>% pander()
+```
+
+
+# Mixture regression models
+
+- In a mixture of regressions, we assume that there are $K$ regression models. 
+- Each data point being associated with one of them. 
+- Again, we don't know which component it came from. This is given by a latent variable. 
+$$
+\begin{aligned}
+y_i &\sim 
+\begin{cases}
+N(\alpha_1 + \beta_1 x_i, \sigma^2_1),\quad\text{if $z_i = 1$}\\
+N(\alpha_2 + \beta_2 x_i, \sigma^2_2),\quad\text{if $z_i = 2$}
+\end{cases},\\
+z_i &\sim P(\pi),
+\end{aligned}
+$$
+
+
+# Mixture regression models
+
+- A mixture of two scatterplots?
+```{r}
+plot(CO2 ~ GNP, data = co2data)
+```
+
+# Mixture regression models
+
+```{r, results='hide'}
+attach(co2data)
+M <- regmixEM(CO2, GNP, k=2)
+```
+```{r}
+plot(M, whichplots = 2)
+```
+
+
+# Mixture regression models
+
+- The inferred coefficients are 
+```{r}
+M$beta %>% pander()
+```
+- The inferred standard deviations
+```{r}
+M$sigma
+```
+
+- The relative probabilities of the two models
+```{r}
+M$lambda
+```
+
+
+
+# Mixture of regressions
+
+- The probabilities for each $z_i$ (for first 10 values)
+```{r}
+round(head(M$posterior, 10),3) %>% pander()
+```
