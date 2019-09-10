@@ -1,0 +1,84 @@
+---
+title: "Piecewise linear models"
+author: |
+  | Mark Andrews
+  | Psychology Department, Nottingham Trent University
+  | 
+  | \faEnvelopeO\  ```mark.andrews@ntu.ac.uk```
+fontsize: 10pt
+output:
+ beamer_presentation:
+  keep_tex: true
+  fonttheme: "serif"
+  includes:
+   in_header: preamble.tex
+---
+
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(modelr)
+theme_set(theme_classic())
+```
+
+# A piecewise linear model
+
+\newcommand{\xcrit}{x_{\text{crit}}}
+
+* Our observed data is $\{(x_1, y_1), (x_2, y_2) \ldots (x_n, y_n)\}$.
+* Our model is
+$$
+y_i \sim N(\mu_i, \sigma^2)
+$$
+where
+$$
+  \mu_i = \begin{cases}
+  \alpha_1 + \beta_1 x_i,\quad\text{if $x_i \leq \xcrit$}\\
+  \alpha_2 + \beta_2 x_i,\quad\text{if $x_i > \xcrit$},
+  \end{cases}
+$$
+where $\alpha_1, \beta_1, \alpha_2, \beta_2, \xcrit$ are unknown.
+
+# Example: A "tent" map
+
+If we require $\beta_1 > 0$ and $\beta_2 < 0$, then for any value of $\alpha_1$, we can ensure that the two lines intersect at $x = \xcrit$, by setting $\alpha_2 = \alpha_1 + \xcrit (\beta_1 - \beta_2)$. The resulting function resembles a, possibly uneven, tent with its sharp peak at $x=\xcrit$.
+    
+```{r, out.width='0.75\\textwidth',fig.align='center'}
+tent_map <- function(x, a_1, b_1, b_2, x_c){
+  (x <= x_c) * (a_1 + b_1 * x) + 
+    (x > x_c) * ((a_1 + x_c * (b_1 - b_2)) + b_2 * x)
+}
+    
+a_1 <- 2.0; b_1 <- 1.25; b_2 <- -2.25; x_c <- 0.5
+
+tent_df <- tibble(x = seq(-2, 2, length.out = 50),
+                  y = tent_map(x, a_1, b_1, b_2, x_c) + rnorm(length(x), sd = 0.5)
+) 
+
+ggplot(tent_df,
+       mapping = aes(x = x, y = y)
+) + geom_point()
+```  
+  
+# Fitting the "tent" map with `nls`
+
+```{r, echo=T}
+M_tent <- nls(y ~ (x <= x_c) * (a_1 + b_1 * x) + 
+              (x > x_c) * ((a_1 + x_c * (b_1 - b_2)) + b_2 * x),
+              start = list(a_1 = 0, b_1 = 2, b_2 = -2, x_c = 0),
+              data = tent_df)
+```
+
+Note that our $\alpha_2$ parameter is constrained to be equal to $\alpha_1 + \xcrit (\beta_1 - \beta_2)$.
+
+# Fitting the "tent" map with `nls`
+
+```{r}
+tent_df %>%
+  add_predictions(M_tent) %>% 
+  ggplot(aes(x = x)) +
+  geom_point(aes(y = y), size = 0.5) +
+  geom_line(aes(y = pred), colour = 'red')
+```
+

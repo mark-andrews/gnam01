@@ -1,0 +1,326 @@
+---
+title: "Negative binomial regression"
+author: |
+  | Mark Andrews
+  | Psychology Department, Nottingham Trent University
+  | 
+  | \faEnvelopeO\  ```mark.andrews@ntu.ac.uk```
+fontsize: 10pt
+output:
+ beamer_presentation:
+  keep_tex: true
+  fonttheme: "serif"
+  includes:
+   in_header: preamble.tex
+---
+
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+library(pander)
+library(cowplot)
+library(pscl)
+library(MASS)
+library(readr)
+
+biochemists_Df <- read_csv('../data/biochemist.csv')
+
+theme_set(theme_classic())
+
+set.seed(10101)
+
+data("bioChemists")
+publications <- bioChemists$art
+
+```
+
+
+# The Poisson Distribution
+
+
+-   The mean of a Poisson distribution is equal to its rate parameter
+    $\lambda$.
+
+-   Its variance is also equal to $\lambda$.
+
+```{r, out.width='0.75\\textwidth', fig.align='center'}
+lambda_0 <- 3.5
+lambda_1 <- 5.0
+lambda_2 <- 10.0
+lambda_3 <- 15.0
+tibble(x = seq(0, 25),
+       y_0 = dpois(x, lambda = lambda_0),
+       y_1 = dpois(x, lambda = lambda_1),
+       y_2 = dpois(x, lambda = lambda_2),
+       y_3 = dpois(x, lambda = lambda_3)
+) %>% gather(lambda, density, -x) %>% 
+  ggplot(aes(x = x, y = density, col = lambda)) +
+  geom_line() + 
+  geom_point() +
+  ylab('P(x)') +
+  guides(col = FALSE)
+```
+As $\lambda$ increases, so too does the variance.
+
+# Means and variances in a Poisson distribution:
+
+- In a Poisson distribution, the variance of a sample should be approximately 
+  the same as the mean of a sample. 
+
+- Example 1:
+```{r, echo=T}
+x <- rpois(100, lambda = 5)
+c(mean(x), var(x), var(x)/mean(x))
+```
+- Example 2:
+```{r, echo=T}
+x <- rpois(100, lambda = 5)
+c(mean(x), var(x), var(x)/mean(x))
+```
+
+    
+# Overdispersion
+
+- If the variance of a sample is greater than would be expected according to a 
+  given theoretical model, then we say the data is *overdispersed*.
+  
+- In count data, if the variance of a sample is much greater than its
+  mean, we say it is overdispersed.
+  
+- Using a Poisson distribution in this situation, this is an example of model mis-specification.
+
+- It will also usually underestimate the standard errors in the Poisson model.
+  
+
+# Overdispersion
+
+- In the `bioChemists` data set, we have counts of the number of articles published
+  by PhD students in the last three years (`publications`):
+```{r, out.width='0.7\\textwidth', fig.align='center'}
+ggplot(bioChemists, aes(x=art)) + geom_histogram(col='white', binwidth = 1)
+```
+  
+
+```{r, echo=T}
+var(publications)/mean(publications)
+```
+
+
+# Overdispersion
+
+- This leads standard errors to be *under*estimated if we use a Poisson model:
+```{r, echo=T}
+M <- glm(publications ~ 1, family=poisson)
+summary(M)$coefficients
+```
+
+
+# Fixing overdispersion using a Quasi-poisson model
+
+- A *quasi* Poisson model allows us to correct over-dispersion
+```{r, echo=T}
+M <- glm(publications ~ 1, family=quasipoisson)
+summary(M)$coefficients
+```
+- It does so by calculating an overdispersion parameter 
+  (roughly, the ratio of the variance to the mean)
+  and multiplying the standard error by its square root.
+  
+- In this example, the overdispersion parameter is 
+  `r summary(M)$dispersion` and so its
+  square root is `r summary(M)$dispersion %>% sqrt()`.
+
+- Alternatively, a *negative binomial regression* is an alternative to Poisson regression
+  that can be used with overdispersed count data.
+  
+# Negative binomial distribution
+
+- A negative binomial distribution is a distribution over non-negative integers.
+- To understand the negative binomial distribution, we start with the binomial
+  distribution:
+- If, for example, we have a coin whose probability of coming up heads is $\theta$,
+  then the number of Heads in a sequence of $n$ flips will follow a 
+  binomial distribution.
+- In this example, an outcome of Heads can be termed a *success*.
+  
+  
+# Negative binomial distribution
+
+- Here is a binomial distribution where $n=25$ and $\theta=0.75$.
+```{r, out.width='0.9\\textwidth', fig.align='center'}
+
+n <- 25
+
+tibble(x = seq(0, n),
+       p = dbinom(x, size=n, prob=0.75)
+) %>% ggplot(aes(x = x, y = p)) + geom_bar(stat = 'identity')
+
+```
+  
+ 
+  
+# Negative binomial distribution
+
+- A *negative* binomial distribution gives the 
+  probability distribution over the number of *successes* (e.g. Heads)
+  before $r$ *failures* (e.g. $r$ Tails).
+- For example, here we have the number of Heads (*successes*) that occur before we observe $r=2$ Tails (*failures*), when the probability of Heads is $\theta=0.75$:
+```{r, out.width='0.8\\textwidth', fig.align='center'}
+
+n <- 25
+
+tibble(x = seq(0, n),
+       p = dnbinom(x, size=2, prob=0.75)
+) %>% ggplot(aes(x = x, y = p)) + geom_bar(stat = 'identity')
+
+```
+  
+  
+# Negative binomial distribution
+
+- Here, we have the number of Heads (*successes*) that occur before we observe $r=3$ Tails (*failures*), when the probability of Heads is $\theta=0.5$:
+```{r, out.width='0.9\\textwidth', fig.align='center'}
+n <- 25
+
+tibble(x = seq(0, n),
+       p = dnbinom(x, size=3, prob=0.5)
+) %>% ggplot(aes(x = x, y = p)) + geom_bar(stat = 'identity')
+
+```
+  
+    
+# Negative binomial distribution
+
+- The probability mass function for the negative binomial distribution is:
+$$
+\Prob{x = k \given r, \theta} = \binom{r+k-1}{k} \theta^r(1-\theta)^k
+$$
+or more generally
+$$
+\Prob{x = k \given r, \theta} = \frac{\Gamma(r + k)}{\Gamma(r) k!} \theta^r(1-\theta)^k,
+$$
+where $\Gamma()$ is a Gamma function ($\Gamma(n) = (n-1)!$).
+
+- In R, for any $k$, $r$, and $\theta$, we can calculate $\Prob{x = k \given r, \theta}$ using `dnbinom`, e.g.
+$\Prob{x = k = 2 \given r=3, \theta=0.75}$ is
+```{r, echo=T}
+dnbinom(2, 3, 0.75)
+```
+  
+# Negative binomial distribution
+
+- In the negative binomial distribution, the mean is 
+$$
+\mu = \frac{\theta}{1-\theta} \times r,
+$$
+and so 
+$$
+p = \frac{r}{r + \mu},
+$$
+and we can generally parameterize the distribution by $\mu$ and $r$.
+  
+# Why use negative binomial distribution?
+
+- A negative binomial distribution is equivalent as weighted sum of Poissons.
+
+```{r, out.width='0.75\\textwidth', fig.align='center'}
+lambda_0 <- 3.5
+lambda_1 <- 5.0
+lambda_2 <- 7.0
+lambda_3 <- 10.0
+tibble(x = seq(0, 25),
+       y_0 = dpois(x, lambda = lambda_0),
+       y_1 = dpois(x, lambda = lambda_1),
+       y_2 = dpois(x, lambda = lambda_2),
+       y_3 = dpois(x, lambda = lambda_3),
+       y_sum = (y_0 + y_1 + y_2 + y_3)/2
+) %>% gather(lambda, density, -x) %>% 
+  ggplot(aes(x = x, y = density, col = lambda)) +
+  geom_line() + 
+  geom_point() +
+  ylab('P(x)') +
+  guides(col = FALSE)
+```
+
+- So it is appropriate to use when the data can be seen as arising from a mixture of
+  Poisson distributions, each with different means.
+  
+  
+# Negative binomial regression
+
+- In negative binomial regression, we have observed counts $y_1, y_2 \ldots y_n$, and 
+  some predictor variables $x_1, x_2 \ldots x_n$,
+  and we assume that
+  $$
+  y_i \sim \mathrm{NegBinomial}(\mu_i, r),
+  $$
+  where $\mathrm{NegBinomial}(\mu_i, r)$ is a negative binomial with mean $\mu_i$ and a 
+  dispersion parameter $r$,
+  and then 
+  $$
+  \log(\mu_i) = \beta_0 + \beta x_i.
+  $$
+
+   
+# Negative binomial regression
+
+- Because it has an overdispersion parameter, we do not have model mispecification or under estimation of 
+standard errors:
+```{r, echo=T}
+M <- glm.nb(publications ~ 1)
+summary(M)$coefficients
+```
+
+# Prediction
+
+- Here, we predict publications by gender:
+```{r, echo=T}
+M <- glm.nb(publications ~ gender, data=biochemists_Df)
+summary(M)$coefficients
+```
+
+- Prediction works exactly like in Poisson regression.
+
+- The predicted log of the mean of number of publictions for men is $0.63265$ and for women it is
+  $0.63265 - 0.24718$, and the predicted means are $e^0.63265 = `r exp(0.63265)`$ and $e^{0.63265 - 0.24718} 
+  = `r exp(0.63265 - 0.24718)`$ 
+
+
+# Coefficients
+
+-   In negative binomial regression, 
+    $$
+    e^\beta,
+    $$
+    where $\beta$ is a coefficient, is the factor by 
+    which the mean of the outcome variable changes for a unit change in the predictor.
+- For example, the coefficient for gender above is $-0.24718$, and males are coded by
+  zero in the dummy variable for sex, and so $e^{-0.24718} = `r exp(-0.24718)`$ is the factor by
+  which the mean publication rate changes as we go from males to females.
+
+
+# Model Fit with Deviance
+
+-   As in the case of logistic and Poisson regression, we estimate the parameters,
+    e.g. $\alpha$ and $\beta$, using maximum likelihood estimation.
+
+-   Once we have the maximum likelihood estimate for the parameters, we
+    can calculate *goodness of fit* using deviance.
+
+-   As before, the *deviance* of a model is defined
+    $$-2 \log  L(\hat{\alpha},\hat{\beta}\given\mathcal{D}) ,$$ where
+    $\hat{\alpha}$, $\hat{\beta}$ are the mle estimates.
+
+# Model Fit with Deviance: Model testing
+
+-   The difference in the deviance of a null model minus the deviance
+    of the full model is $$\Delta_{D} = D_0 - D_1.$$
+
+-   Under the null hypothesis, $\Delta_D$ is distributed as $\chi^2$
+    with $k$ degrees of freedom, where $k$ is the difference in the number of parameters 
+    in the two models.
+
