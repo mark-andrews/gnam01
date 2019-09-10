@@ -1,0 +1,74 @@
+---
+title: "Nonlinear regression"
+author: |
+  | Mark Andrews
+  | Psychology Department, Nottingham Trent University
+  | 
+  | \faEnvelopeO\  ```mark.andrews@ntu.ac.uk```
+fontsize: 10pt
+output:
+ beamer_presentation:
+  keep_tex: true
+  fonttheme: "serif"
+  includes:
+   in_header: preamble.tex
+---
+
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(tidyverse)
+theme_set(theme_classic())
+```
+
+# Nonlinear regression
+
+* Assume our data is $\{(x_1, y_1), (x_2, y_2) \ldots (x_n, y_n)\}$.
+* A normal *nonlinear* model of this data is as follows:
+$$
+y_i \sim N(\mu_i, \sigma^2)
+$$
+where
+$$
+\mu_i = f(x_i)
+$$
+with $f$ being a nonlinear function.
+
+
+# A smooth nonlinear function
+
+```{r}
+Df <- local({
+  b <- 3.0
+  alpha <- 0.75
+  beta <- 0.25
+  tibble(x = seq(-10, 10, length.out = 50),
+         y = b * tanh(alpha + beta*x) + rnorm(length(x), sd = 0.5))
+})
+
+
+## ---- tanh, echo=F, out.width='\\textwidth', fig.align='center', fig.cap='a) The $\\tanh$, or hyperbolic tangent, function. b) Data normally distributed around a linear function of a $\\tanh$ function.'----
+tibble(x = seq(-3, 3, length.out = 1000),
+                 y = tanh(x)) %>% 
+  ggplot(aes(x = x, y = y)) + 
+  geom_line() +
+  theme(aspect.ratio = 1/2) + ylab('y') + xlab('x') 
+
+```
+
+# Smooth function plus noise
+
+```{r}
+ggplot(Df, aes(x = x, y = y)) +
+  geom_point(size = 0.5) +
+  theme(aspect.ratio = 1/2) + ylab('y') + xlab('x') 
+```
+
+# Fitting using `nls`
+
+```{r, echo = T}
+M <- nls(y ~ b * tanh(alpha + beta * x), 
+         start = list(b = 1, alpha = 0, beta = 1),
+         data = Df)
+```
+
