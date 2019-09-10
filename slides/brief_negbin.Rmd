@@ -217,10 +217,11 @@ dnbinom(2, 3, 0.75)
 $$
 \mu = \frac{\theta}{1-\theta} \times r,
 $$
-and so 
-$$
-p = \frac{r}{r + \mu},
-$$
+<!-- and so  -->
+<!-- $$ -->
+<!-- p = \frac{r}{r + \mu}, -->
+<!-- $$ -->
+
 and we can generally parameterize the distribution by $\mu$ and $r$.
   
 # Why use negative binomial distribution?
