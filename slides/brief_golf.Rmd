@@ -1,0 +1,130 @@
+---
+title: "Nonlinear regression for Golf Putting"
+author: |
+  | Mark Andrews
+  | Psychology Department, Nottingham Trent University
+  | 
+  | \faEnvelopeO\  ```mark.andrews@ntu.ac.uk```
+fontsize: 10pt
+output:
+ beamer_presentation:
+  keep_tex: true
+  fonttheme: "serif"
+  includes:
+   in_header: preamble.tex
+---
+
+```{r, echo=F}
+knitr::opts_chunk$set(echo = F, prompt = F, warning = F, message = F, comment='#>')
+# Thanks to 
+# https://github.com/ramnathv/slidify/issues/189#issuecomment-15850008
+hook1 <- function(x){ gsub("```\n*```r*\n*", "", x) }
+hook2 <- function(x){ gsub("```\n+```\n", "", x) }
+knitr::knit_hooks$set(document = hook1)
+```
+
+```{r}
+library(tidyverse)
+library(magrittr)
+theme_set(theme_classic())
+```
+
+# Golf Putting Data
+
+* This data provides the number of putting attempts and the number of successful putts at various distances (in feet) from the hole. 
+```{r, eval = F, echo=T}
+golf_df <- read_csv('golf_putts.csv')
+```
+```{r}
+golf_df <- read_csv('../data/golf_putts.csv')
+```
+
+* The absolute number of attempts and successes at each distance is vital information and so ideally we should base our analysis on this data, using a binomial logistic regression or a related model. 
+* However, for simplicity here, we will just use the relative frequencies of successes at each distance.
+```{r, echo=T}
+golf_df %<>% mutate(prob = success/attempts)
+```
+
+# Golf Putting Data
+
+```{r}
+ggplot(golf_df,
+       mapping = aes(x = distance, y = prob)
+) + geom_point() + 
+  ylab('Probability of the golf ball landing in hole') +
+  xlab('Distance from the hole (ft)')
+```
+
+# A model
+\begin{figure}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{golf_putting_v2.pdf}
+\caption{A golf ball of radius $r$ (left) and the golf hole of radius $R$ (right). The centres of these two circles are $d$ apart. If the golf ball travels in a straight vertical line to the hole, it will fall in. If its trajectory deviates, either to the right or to the line, greater than an angle of $\theta_{\text{crit}}$, it will miss.
+The angle $\theta_{\text{crit}}$ is the angle between the vertical line of length $d$ and the tangent line from the centre of the ball to the hole. The line from the centre of the hole meets the tangent line at a right angle. As such, $\theta_{\text{crit}} = \sin^{-1}\left(\tfrac{R}{d}\right)$.
+}
+\label{golf_diagram}
+\end{center}
+\end{figure}
+
+# A physical model
+
+The probability that the angle of their putt will be between $0$ and $\theta_{\text{crit}}$ is
+$$
+\Prob{0 < \theta \leq \theta_{\text{crit}}} = \Phi(\theta_{\text{crit}}\given 0, \sigma^2) - \tfrac{1}{2},
+$$
+where
+$$
+\Phi(\theta_{\text{crit}}\given 0, \sigma^2) \triangleq
+\int_{-\infty}^{\theta_{\text{crit}}} N(\theta \given 0, \sigma^2),
+$$
+which is the value at $\theta_{\text{crit}}$ of the cumulative distribution function of a normal distribution of mean 0 and standard deviation $\sigma$.
+We simply double the quantity $\Phi(\theta_{\text{crit}}\given 0, \sigma^2) - \tfrac{1}{2}$ to get $\Prob{\theta_{\text{crit}} < \theta \leq \theta_{\text{crit}}}$.
+
+Therefore, the probability of a sucessful putt is
+$$
+2 \Phi\left(\sin^{-1}\left(\tfrac{R}{d}\right)\given 0, \sigma^2\right) - 1.
+$$
+
+# Implementation 
+
+* This is a nonlinear parameteric function of distance $d$, where $R$ is known to have a value of 53.975mm, and $\sigma$ is the single unknown parameter.
+
+* This nonlinear function is easily implemented as follows.
+```{r, echo=T}
+successful_putt_f <- function(d, sigma){
+  R <- 0.17708333 # 53.975mm in feet
+  2 * pnorm(asin(R/d), mean=0, sd=abs(sigma)) -1
+}
+```
+
+# Using `nls`
+
+The `nls` based model using this `successful_putt_f` function is as follows.
+```{r, echo=T}
+M_putt <- nls(prob ~ successful_putt_f(distance, sigma),
+              data = golf_df,
+              start = list(sigma = 0.1)
+)
+```
+
+# The predictions
+
+```{r}
+golf_df %>%
+  mutate(prediction = predict(M_putt)) %>%
+ggplot(mapping = aes(x = distance)) +
+  geom_point(mapping = aes(y = prob)) +
+  geom_line(mapping = aes(y = prediction), col='red') +
+  ylab('Probability of the golf ball landing in hole') +
+  xlab('Distance from the hole (ft)')
+```
+
+# An simpler alternative?
+
+```{r, echo=T}
+M_putt_exp <- nls(prob ~ a + b * exp(-beta * distance),
+                  data = golf_df,
+                  start = list(a = 0, b = 1, beta = 1)
+)
+```
+

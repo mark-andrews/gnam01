@@ -3,7 +3,7 @@ knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(modelr)
 theme_set(theme_classic())
-
+library(rstan)
 
 ## ---- out.width='0.75\\textwidth',fig.align='center'---------------------
 tent_map <- function(x, a_1, b_1, b_2, x_c){
@@ -36,3 +36,7 @@ tent_df %>%
   geom_point(aes(y = y), size = 0.5) +
   geom_line(aes(y = pred), colour = 'red')
 
+
+
+
+            
